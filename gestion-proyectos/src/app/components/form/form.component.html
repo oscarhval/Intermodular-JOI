@@ -1,0 +1,51 @@
+<div class="card bg-light text-dark">
+  <div class="card-header">
+    <h2 class="mb-0">{{ editMode ? 'Editar Proyecto' : 'Nuevo Proyecto' }}</h2>
+  </div>
+
+  <div class="card-body">
+    <form [formGroup]="projectForm" (ngSubmit)="onSubmit()">
+      <div class="mb-3">
+        <label for="name" class="form-label">Nombre del Proyecto</label>
+        <input
+          id="name"
+          type="text"
+          class="form-control"
+          formControlName="name"
+          [class.is-invalid]="projectForm.get('name')?.invalid && projectForm.get('name')?.touched"
+        />
+        <div *ngIf="projectForm.get('name')?.invalid && projectForm.get('name')?.touched" class="invalid-feedback">
+          El nombre es obligatorio.
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="description" class="form-label">Descripción</label>
+        <textarea
+          id="description"
+          class="form-control"
+          rows="3"
+          formControlName="description"
+        ></textarea>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Tecnologías</label>
+        <div formArrayName="technologies">
+          <div class="input-group mb-2" *ngFor="let techCtrl of technologies.controls; let i=index">
+            <input type="text" class="form-control" [formControlName]="i" />
+            <button type="button" class="btn btn-outline-danger" (click)="removeTechnology(i)">X</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-dark" (click)="addTechnology()">+ Añadir Tecnología</button>
+      </div>
+
+      <div class="mt-4">
+        <button type="submit" class="btn btn-primary me-2" style="background-color: blue; color: white; font-weight: bold;">
+          {{ editMode ? 'Actualizar' : 'Crear' }}
+        </button>
+        <button type="button" class="btn btn-secondary" style="color: white; font-weight: bold;" (click)="cancel()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
