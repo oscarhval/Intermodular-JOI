@@ -2,7 +2,7 @@ import firebase from 'firebase/compat/app';
 import 'firebase/compat/firestore';
 
 const firebaseConfig = {
-    apiKey: "AIzaSyD8L3our6X-TQOO4I2RZ-rQLQPwD78fgPk",
+    apiKey: "",
     authDomain: "intermodular-joi.firebaseapp.com",
     projectId: "intermodular-joi",
     storageBucket: "intermodular-joi.firebasestorage.app",
