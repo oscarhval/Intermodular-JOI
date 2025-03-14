@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { firestore } from './firebaseConfig';
-import { Bar, Pie } from 'react-chartjs-2';
+import { Bar, Pie,Line  } from 'react-chartjs-2';
+
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
@@ -9,8 +10,11 @@ const Dashboard = () => {
   const [facturas, setFacturas] = useState([]);
   const [perfiles, setPerfiles] = useState([]);
   const [selectedProfile, setSelectedProfile] = useState('');
+  
 
   useEffect(() => {
+  
+    
     const unsubscribeProjects = firestore
       .collection('projects')
       .onSnapshot(snapshot => {
@@ -21,6 +25,7 @@ const Dashboard = () => {
         setProjects(projectsData);
       });
 
+      
     const unsubscribeFacturas = firestore
       .collection('facturas')
       .onSnapshot(snapshot => {
@@ -51,6 +56,10 @@ const Dashboard = () => {
     };
   }, [selectedProfile]);
 
+
+
+  
+
   const profileInfo = perfiles.find(perfil => perfil.name === selectedProfile);
 
   const chartData = {
@@ -58,26 +67,39 @@ const Dashboard = () => {
     datasets: [
       {
         label: 'Cantidad de Tecnologías',
-        data: projects.map(project =>
+        data: projects.map(project => 
           project.technologies ? project.technologies.length : 0
         ),
-        backgroundColor: 'rgba(75,192,192,0.4)'
+        backgroundColor: (context) => {
+          const chart = context.chart;
+          const { ctx, chartArea } = chart;
+          if (!chartArea) return null;
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgb(100, 201, 255)');
+          gradient.addColorStop(1, 'rgb(0, 34, 255)');
+          return gradient;
+        },
+        borderColor: 'rgba(0, 0, 0, 0.6)',
+        borderWidth: 2,
+        hoverBackgroundColor: 'rgba(0, 34, 255,0.8)',
+        hoverBorderColor: 'rgba(0, 0, 0, 0.6)',
+        hoverBorderWidth: 3,
+        barThickness: 20,
+        barPercentage: 0.9,  
       }
     ]
   };
 
   const facturasByType = facturas.reduce((acc, factura) => {
     let type = factura.tipo || factura.type || 'Sin Tipo';
-
-    if (
-      type === 'Seleccionar tipo de factura'
-    ) {
+    if (type === 'Seleccionar tipo de factura') {
       type = 'Sin tipo';
     }
-
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {});
+
+
 
   const pieData = {
     labels: Object.keys(facturasByType),
@@ -85,21 +107,50 @@ const Dashboard = () => {
       {
         data: Object.values(facturasByType),
         backgroundColor: Object.keys(facturasByType).map((_, i) => {
-          const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#8A2BE2', '#4BC0C0'];
+          const colors = [
+            'rgb(47, 0, 255)',
+            'rgb(100, 154, 255)',
+            'rgb(151, 151, 151)',
+          ];
           return colors[i % colors.length];
         }),
         hoverBackgroundColor: Object.keys(facturasByType).map((_, i) => {
-          const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#8A2BE2', '#4BC0C0'];
-          return colors[i % colors.length];
-        })
+          const hoverColors = [
+            'rgba(0, 0, 0, 0.8)'
+          ];
+          return hoverColors[i % hoverColors.length];
+        }),
+        borderColor: 'rgba(0, 0, 0, 0.6)',
+        borderWidth: 2,
+        hoverBorderColor: 'rgba(0, 0, 0, 0.8)',
+        hoverBorderWidth: 3
       }
     ]
   };
 
-  const totalFacturado = facturas.reduce(
-    (acc, factura) => acc + parseFloat(factura.total || 0),
+  const totalIngresos = facturas.reduce(
+    (acc, factura) => {
+      if (factura.tipo === "Venta") {
+        return acc + parseFloat(factura.total || 0);
+      }
+      return acc;
+    },
     0
   );
+
+  const totalPerdidas = facturas.reduce(
+    (acc, factura) => {
+      if (factura.tipo === "Compra") {
+        return acc + parseFloat(factura.total || 0);
+      }
+      return acc;
+    },
+    0
+  );
+
+  const gananciaPerdidaNeta = totalIngresos - totalPerdidas;
+  const gananciaPerdidaNetaColor = gananciaPerdidaNeta >= 0 ? 'green' : 'red';
+  const totalFacturas = facturas.length;
 
   return (
     <div style={styles.container}>
@@ -126,6 +177,7 @@ const Dashboard = () => {
             ))}
           </select>
         </div>
+
         {profileInfo ? (
           <div style={styles.profileInfo}>
             <h3 style={styles.profileInfoH3}>{profileInfo.name}</h3>
@@ -135,11 +187,15 @@ const Dashboard = () => {
               {profileInfo.requisitos &&
                 profileInfo.requisitos.map((req, index) => (
                   <li key={index} style={styles.profileInfoLi}>
-                    {req}
+                    {index + 1}. {req}
                   </li>
                 ))}
             </ul>
+
+           
+
           </div>
+
         ) : (
           <p>Cargando información del perfil...</p>
         )}
@@ -183,7 +239,7 @@ const Dashboard = () => {
         </div>
         <div style={styles.chartContainer}>
           <h3 style={styles.projectsListH3}>
-            Comparativa de Proyectos (Cantidad de Tecnologías)
+            Comparativa de Proyectos
           </h3>
           <Bar data={chartData} options={{ responsive: true }} />
         </div>
@@ -191,10 +247,24 @@ const Dashboard = () => {
 
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Facturación</h2>
+
         <div style={styles.facturacion}>
           <p style={styles.facturacionP}>
-            <strong style={styles.strongColor}>Total Importe Facturado:</strong>{' '}
-            {totalFacturado.toFixed(2)}
+            <strong style={styles.strongColor}>Nº total de Facturas:</strong>{' '}
+            {totalFacturas}
+            <br />
+            <strong style={styles.strongColor}>Total ingresos por ventas:</strong>{' '}
+            {totalIngresos.toFixed(2)} €
+            <br />
+            <strong style={styles.strongColor}>Total pérdidas por compras:</strong>{' '}
+            {totalPerdidas.toFixed(2)} €
+            <br />
+            <strong style={styles.strongColor}>Ganancia - Pérdida Neta:</strong>{' '}
+            <span style={{ color: gananciaPerdidaNetaColor }}>
+              {gananciaPerdidaNeta >= 0
+                ? `${gananciaPerdidaNeta.toFixed(2)} €`
+                : `${gananciaPerdidaNeta.toFixed(2)} €`}
+            </span>
           </p>
         </div>
         <div style={styles.pieChartContainer}>
@@ -216,7 +286,7 @@ const styles = {
     color: '#202124',
     display: 'flex',
     flexDirection: 'column',
-    padding: '20px'
+    padding: '20px',
   },
   header: {
     background: '#1a73e8',
@@ -227,12 +297,12 @@ const styles = {
     borderBottomLeftRadius: '50px',
     borderBottomRightRadius: '50px',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
-    marginBottom: '40px'
+    marginBottom: '40px',
   },
   h1: {
     margin: 0,
     fontSize: '2.5rem',
-    fontWeight: 700
+    fontWeight: 700,
   },
   section: {
     width: '880px',
@@ -240,7 +310,7 @@ const styles = {
     background: '#fff',
     borderRadius: '16px',
     padding: '30px',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
   },
   sectionTitle: {
     marginTop: 0,
@@ -249,66 +319,101 @@ const styles = {
     color: '#1a73e8',
     borderBottom: '2px solid #1a73e8',
     display: 'inline-block',
-    paddingBottom: '5px'
+    paddingBottom: '5px',
   },
   profileSelect: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '20px'
+    marginBottom: '20px',
   },
   profileSelectLabel: {
     marginRight: '10px',
     fontSize: '1rem',
-    color: '#5f6368'
+    color: '#5f6368',
   },
   profileSelectSelect: {
     padding: '8px 12px',
     borderRadius: '8px',
     border: '1px solid #ccc',
     fontSize: '1rem',
-    outline: 'none'
+    outline: 'none',
   },
   profileInfo: {
     background: '#f1f3f4',
     padding: '20px',
     borderRadius: '12px',
-    marginBottom: '20px'
+    marginBottom: '20px',
   },
   profileInfoH3: {
     marginTop: 0,
     fontSize: '1.4rem',
-    color: '#1a73e8'
+    color: '#1a73e8',
   },
   profileInfoP: {
     color: '#5f6368',
-    lineHeight: 1.6
+    lineHeight: 1.6,
   },
   profileInfoH4: {
     marginBottom: '10px',
-    color: '#202124'
+    color: '#202124',
   },
   profileInfoUl: {
     listStyle: 'none',
     margin: 0,
-    padding: 0
+    padding: 0,
   },
+
+  chartContainer: {
+    background: '#fdfdfd',
+    padding: '20px',
+    borderRadius: '12px',
+    border: '1px solid #ececec',
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+    marginTop: '20px',
+  },
+  
   profileInfoLi: {
     borderBottom: '1px dashed #ccc',
-    padding: '5px 0'
+    padding: '5px 0',
+  },
+  profileProgressContainer: {
+    marginTop: '20px',
+    background: '#f9f9f9',
+    padding: '15px',
+    borderRadius: '8px',
+  },
+  profileProgressItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '10px',
+  },
+  progressBarContainer: {
+    width: '80%',
+    height: '8px',
+    backgroundColor: '#e0e0e0',
+    borderRadius: '8px',
+    overflow: 'hidden',
+  },
+  progressBar: {
+    width: '60%',
+    height: '100%',
+    backgroundColor: '#1a73e8',
+    transition: 'width 0.5s ease',
   },
   projectsList: {
-    marginBottom: '20px'
+    marginBottom: '20px',
   },
   projectsListH3: {
     fontSize: '1.3rem',
     marginTop: 0,
     marginBottom: '15px',
-    color: '#1a73e8'
+    color: '#1a73e8',
   },
   projectsListUl: {
     listStyle: 'none',
     margin: 0,
-    padding: 0
+    padding: 0,
   },
   projectsListLi: {
     background: '#fdfdfd',
@@ -316,7 +421,7 @@ const styles = {
     padding: '12px',
     borderRadius: '8px',
     border: '1px solid #ececec',
-    transition: 'transform 0.3s ease, boxShadow 0.3s ease'
+    transition: 'transform 0.3s ease, boxShadow 0.3s ease',
   },
   chartContainer: {
     background: '#fdfdfd',
@@ -324,7 +429,7 @@ const styles = {
     borderRadius: '12px',
     border: '1px solid #ececec',
     boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-    marginTop: '20px'
+    marginTop: '20px',
   },
   facturacion: {
     background: '#fdfdfd',
@@ -332,19 +437,19 @@ const styles = {
     borderRadius: '12px',
     border: '1px solid #ececec',
     textAlign: 'center',
-    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
+    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
   },
   facturacionP: {
     fontSize: '1.2rem',
-    margin: 0
+    margin: 0,
   },
   strongColor: {
-    color: '#1a73e8'
+    color: '#1a73e8',
   },
   pieChartContainer: {
     width: '400px',
-    margin: '20px auto 0 auto'
-  }
+    margin: '20px auto 0 auto',
+  },
 };
 
 export default Dashboard;
